@@ -62,7 +62,24 @@ def create_wallet():
 
         <div class="wallet-box">
             <p>Your new wallet address:</p>
-            <div class="wallet-address">{wallet_address}</div>
+            <div id="wallet" class="wallet-address">
+            {wallet_address}
+    </div>
+
+    <br>
+
+        <button onclick="copyWallet()">
+            📋 Copy Address
+    </button>
+
+    <script>
+    function copyWallet() {{
+        navigator.clipboard.writeText(
+            document.getElementById("wallet").innerText
+        );
+        alert("Wallet copied!");
+    }}
+    </script>
         </div>
 
         <br><br>
