@@ -2,9 +2,98 @@ from flask import Flask, jsonify, request
 import random
 import string
 import time
+import sqlite3
 from jincoin import jincoin
 
 app = Flask(__name__)
+wallets = []
+users = {}
+
+def init_db():
+    conn = sqlite3.connect("nova.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            username TEXT PRIMARY KEY,
+            password TEXT NOT NULL,
+            wallet TEXT NOT NULL
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+init_db()
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    if request.method == "POST":
+        username = request.form["username"].upper()
+        password = request.form["password"]
+
+        random_part = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=16)
+        )
+
+        wallet_address = f"NOVA{random_part}"
+
+        conn = sqlite3.connect("nova.db")
+        cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+        "INSERT INTO users (username, password, wallet) VALUES (?, ?, ?)",
+        (username, password, wallet_address)
+        )
+
+        conn.commit()
+
+    except sqlite3.IntegrityError:
+        conn.close()
+
+        return """
+        <html>
+        <body style="background:#0f1117; color:white; font-family:Arial; text-align:center; padding-top:100px;">
+            <h1 style="color:#ff6b6b;">❌ Username Already Exists</h1>
+            <a href="/signup">Try Again</a>
+            <br><br>
+            <a href="/">← Back Explorer</a>
+        </body>
+        </html>
+        """
+
+    conn.close()
+
+    return f"""
+        <html>
+        <body style="background:#0f1117; color:white; font-family:Arial; text-align:center; padding-top:100px;">
+            <h1 style="color:#f39c12;">✅ Account Created</h1>
+            <h2>{username}</h2>
+            <p>Your NOVA Wallet:</p>
+            <h2 style="color:#7dffb2;">{wallet_address}</h2>
+            <a href="/">← Back Explorer</a>
+        </body>
+        </html>
+        """
+
+    return """
+    <html>
+    <body style="background:#0f1117; color:white; font-family:Arial; text-align:center; padding-top:100px;">
+        <h1 style="color:#f39c12;">👤 NOVA Sign Up</h1>
+
+        <form method="POST">
+            <input type="text" name="username" placeholder="Username">
+            <input type="password" name="password" placeholder="Password">
+            <button type="submit">Create Account</button>
+        </form>
+
+        <br>
+        <a href="/">← Back Explorer</a>
+    </body>
+    </html>
+    """
 
 
 @app.route("/create_wallet")
@@ -14,6 +103,7 @@ def create_wallet():
     )
 
     wallet_address = f"NOVA_{random_part}"
+    wallets.append(wallet_address)
 
     return f"""
     <html>
@@ -89,6 +179,67 @@ def create_wallet():
     </html>
     """
 
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form["username"].upper()
+        password = request.form["password"]
+
+        conn = sqlite3.connect("nova.db")
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT wallet FROM users WHERE username = ? AND password = ?",
+            (username, password)
+        )
+
+        result = cursor.fetchone()
+        conn.close()
+
+        if result:
+            wallet_address = result[0]
+
+            return f"""
+            <html>
+            <body style="background:#0f1117; color:white; font-family:Arial; text-align:center; padding-top:100px;">
+                <h1 style="color:#f39c12;">✅ Login Success</h1>
+                <h2>{username}</h2>
+                <p>Your NOVA Wallet:</p>
+                <h2 style="color:#7dffb2;">{wallet_address}</h2>
+                <br>
+                <a href="/">← Back Explorer</a>
+            </body>
+            </html>
+            """
+
+        return """
+        <html>
+        <body style="background:#0f1117; color:white; font-family:Arial; text-align:center; padding-top:100px;">
+            <h1 style="color:#ff6b6b;">❌ Login Failed</h1>
+            <p>Wrong username or password</p>
+            <a href="/login">Try Again</a>
+            <br><br>
+            <a href="/">← Back Explorer</a>
+        </body>
+        </html>
+        """
+
+    return """
+    <html>
+    <body style="background:#0f1117; color:white; font-family:Arial; text-align:center; padding-top:100px;">
+        <h1 style="color:#f39c12;">🔐 NOVA Login</h1>
+
+        <form method="POST">
+            <input type="text" name="username" placeholder="Username">
+            <input type="password" name="password" placeholder="Password">
+            <button type="submit">Login</button>
+        </form>
+
+        <br>
+        <a href="/">← Back Explorer</a>
+    </body>
+    </html>
+    """
 
 @app.route("/mine")
 def mine():
@@ -402,6 +553,7 @@ def home():
         "Harper",
         "Henry",
         "Minho",
+        "Hyoungjoo Ha",
         "Jisoo",
         "Yuna",
         "Jihoon",
@@ -539,7 +691,17 @@ def home():
 
     <body>
     <h1>🟠 NOVA CHAIN</h1>
+    <br>
 
+    <a href="/signup">
+        <button>👤 Sign Up</button>
+    </a>
+
+    <a href="/login">
+        <button>🔐 Login</button>
+    </a>
+
+    <br><br>
         </div>
 
     <div class="card">
@@ -577,6 +739,19 @@ def home():
         <p>JINKYO SUH: {jincoin.get_balance("JINKYO SUH")} NOVA</p>
         <p>ARIM KIM: {jincoin.get_balance("ARIM KIM")} NOVA</p>
         <p>Charlie: {jincoin.get_balance("Charlie")} NOVA</p>
+    </div>
+
+    <div class="card">
+        <h2>🔐 Created Wallets</h2>
+    """
+
+    for wallet in wallets:
+        html += f"""
+        <p>{wallet}</p>
+    """
+
+    html += f"""
+
     </div>
 
     <div class="card">
@@ -660,6 +835,10 @@ def home():
 
     <a href="/mine">
         <button class="mine-btn">⛏ Mine New Block</button>
+    </a>
+
+    <a href="/signup">
+        <button class="mine-btn">👤 Sign Up</button>
     </a>
 
     <br><br>
