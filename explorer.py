@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, session
+from flask import Flask, jsonify, request, session, redirect
 import random
 import string
 import sqlite3
@@ -161,7 +161,56 @@ def login():
     </body>
     </html>
     """
+@app.route("/mywallet")
+def mywallet():
+    if "username" not in session:
+        return """
+        <h1>❌ Please Login First</h1>
+        <a href="/login">Login</a>
+        <br><br>
+        <a href="/">Back Explorer</a>
+        """
 
+    username = session["username"]
+
+    conn = sqlite3.connect("nova.db")
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT wallet FROM users WHERE username = ?",
+        (username,)
+    )
+
+    result = cursor.fetchone()
+    conn.close()
+
+    if not result:
+        return """
+        <h1>❌ Wallet Not Found</h1>
+        <a href="/">Back Explorer</a>
+        """
+
+    wallet_address = result[0]
+    balance = jincoin.get_balance(username)
+
+    return f"""
+    <html>
+    <body style="background:#0f1117; color:white; font-family:Arial; text-align:center; padding-top:80px;">
+        <h1 style="color:#f39c12;">👤 My NOVA Wallet</h1>
+
+        <h2>{username}</h2>
+
+        <p>Wallet Address:</p>
+        <h2 style="color:#7dffb2;">{wallet_address}</h2>
+
+        <p>Balance:</p>
+        <h2 style="color:#7dffb2;">{balance} NOVA</h2>
+
+        <br>
+        <a href="/">← Back Explorer</a>
+    </body>
+    </html>
+    """
 
 @app.route("/logout")
 def logout():
@@ -255,7 +304,13 @@ def create_wallet():
 
 @app.route("/mine")
 def mine():
-    jincoin.mine_pending_transactions("NOVA_WALLET")
+
+    if "username" in session:
+        miner = session["username"]
+    else:
+        miner = "NOVA_WALLET"
+
+    jincoin.mine_pending_transactions(miner)
 
     return """
     <html>
@@ -646,7 +701,7 @@ def home():
         login_info = f"""
         <h3>👋 {session["username"]} 님 환영합니다</h3>
         <p>🔐 Wallet: {session.get("wallet", "")}</p>
-        <a href="/logout"><button>🚪 Logout</button></a>
+         
         """
 
     html = f"""
@@ -743,6 +798,8 @@ def home():
 
         <a href="/signup"><button>👤 Sign Up</button></a>
         <a href="/login"><button>🔐 Login</button></a>
+        <a href="/mywallet"><button>👤 My Wallet</button></a>
+        <a href="/logout"><button>🚪 Logout</button></a>
 
         <br><br>
 
