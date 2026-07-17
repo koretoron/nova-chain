@@ -4,8 +4,10 @@ import string
 import sqlite3
 from jincoin import jincoin
 
+import os
+
 app = Flask(__name__)
-app.secret_key = "nova_secret_key"
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
 
 wallets = []
 
@@ -387,7 +389,7 @@ def profile():
 
     <h3>🏆 Rank</h3>
     <p>#{rank}</p>
-    
+
     <br>
 
     <a href="/">
