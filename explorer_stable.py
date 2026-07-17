@@ -270,192 +270,6 @@ def transactions():
 
     return html
 
-@app.route("/send")
-def send():
-
-    if "username" not in session:
-        return """
-        <h1>❌ Please Login First</h1>
-        <a href="/login">Login</a>
-        """
-
-    username = session["username"]
-
-    return f"""
-    <html>
-    <body style="
-        background:#0f1117;
-        color:white;
-        font-family:Arial;
-        text-align:center;
-        padding-top:80px;
-    ">
-        <h1 style="color:#f39c12;">💸 Send NOVA</h1>
-
-        <p>From:</p>
-        <h2 style="color:#7dffb2;">{username}</h2>
-
-        <form action="/send_nova" method="POST">
-
-            <input
-                type="text"
-                name="receiver"
-                placeholder="Receiver"
-                required
-            >
-
-            <br><br>
-
-            <input
-                type="number"
-                name="amount"
-                placeholder="Amount"
-                required
-            >
-
-            <br><br>
-
-            <button type="submit">
-                Send NOVA
-            </button>
-
-        </form>
-
-        <br>
-        <a href="/">← Back Explorer</a>
-
-    </body>
-    </html>
-    """
-
-@app.route("/profile")
-def profile():
-
-    if "username" not in session:
-        return """
-        <h1>Please Login First</h1>
-        <a href="/login">Login</a>
-        """
-
-    username = session["username"]
-    balance = jincoin.get_balance(username)
-
-    all_wallet_names = set()
-
-    for block in jincoin.chain:
-        for tx in block.transactions:
-            if isinstance(tx, dict):
-                all_wallet_names.add(tx.get("from", ""))
-                all_wallet_names.add(tx.get("to", ""))
-
-    for tx in jincoin.pending_transactions:
-        if isinstance(tx, dict):
-            all_wallet_names.add(tx.get("from", ""))
-            all_wallet_names.add(tx.get("to", ""))
-
-    all_wallet_names.add(username)
-    all_wallet_names.add("NOVA_WALLET")
-    all_wallet_names.discard("")
-    all_wallet_names.discard("network")
-
-    sorted_wallets = sorted(
-        all_wallet_names,
-        key=lambda name: jincoin.get_balance(name),
-        reverse=True
-    )
-
-    rank = sorted_wallets.index(username) + 1
-
-
-
-    return f"""
-    <html>
-    <body style="
-        background:#0f1117;
-        color:white;
-        font-family:Arial;
-        text-align:center;
-        padding-top:80px;
-    ">
-
-    <h1>👤 My Profile</h1>
-
-    <h2>{username}</h2>
-
-    <h3>💰 Balance</h3>
-    <p>{balance:,} NOVA</p>
-
-    <h3>🏆 Rank</h3>
-    <p>#{rank}</p>
-    
-    <br>
-
-    <a href="/">
-        <button>🏠 Back Explorer</button>
-    </a>
-
-    </body>
-    </html>
-    """
-
-@app.route("/send_nova", methods=["POST"])
-def send_nova():
-
-    if "username" not in session:
-        return """
-        <h1>❌ Please Login First</h1>
-        """
-
-    sender = session["username"]
-
-    receiver = request.form["receiver"].strip()
-    amount = int(request.form["amount"])
-
-    if amount <= 0:
-        return """
-        <h1>❌ Invalid Amount</h1>
-        <a href="/send">Back</a>
-        """
-
-    if jincoin.get_balance(sender) < amount:
-        return """
-        <h1>❌ Not Enough Balance</h1>
-        <a href="/send">Back</a>
-        """
-
-    jincoin.create_transaction(
-        sender,
-        receiver,
-        amount
-    )
-
-    return f"""
-    <html>
-    <body style="
-        background:#0f1117;
-        color:white;
-        text-align:center;
-        padding-top:100px;
-        font-family:Arial;
-    ">
-        <h1 style="color:#7dffb2;">
-            ✅ Transaction Added
-        </h1>
-
-        <p>
-            {sender}
-            →
-            {receiver}
-        </p>
-
-        <h2>{amount} NOVA</h2>
-
-        <a href="/">Back Explorer</a>
-
-    </body>
-    </html>
-    """
-
 @app.route("/logout")
 def logout():
     session.clear()
@@ -898,15 +712,8 @@ def home():
         receiver = random.choice(receivers)
         amount = random.randint(1, 20)
 
-        if (
-            sender != receiver
-            and jincoin.get_balance(sender) >= amount
-        ):
-            jincoin.create_transaction(
-                sender,
-                receiver,
-                amount
-        )
+        if sender != receiver:
+            jincoin.create_transaction(sender, receiver, amount)
 
     nova_price = round(random.uniform(0.05, 0.15), 4)
     nova_change = round(random.uniform(-5, 15), 2)
@@ -926,49 +733,22 @@ def home():
     users_db = cursor.fetchall()
     conn.close()
 
-    all_wallet_names = set()
-
-    for username, wallet in users_db:
-        all_wallet_names.add(username)
-        all_wallet_names.add(wallet)
-
-    all_wallet_names.add("NOVA_WALLET")
-
-    for block in jincoin.chain:
-        for tx in block.transactions:
-            if isinstance(tx, dict):
-                all_wallet_names.add(tx.get("from", ""))
-                all_wallet_names.add(tx.get("to", ""))
-
-    for tx in jincoin.pending_transactions:
-        if isinstance(tx, dict):
-            all_wallet_names.add(tx.get("from", ""))
-            all_wallet_names.add(tx.get("to", ""))
-
-    all_wallet_names.discard("")
-    all_wallet_names.discard("network")
-
-    sorted_wallets = sorted(
-        all_wallet_names,
-        key=lambda name: jincoin.get_balance(name),
-        reverse=True
-    )
-
     wallet_count = len(user_names) + len(users_db)
 
-    medals = ["🥇","🥈","🥉","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"]
+    holders = []
+    for username, wallet in users_db:
+        holders.append((username, jincoin.get_balance(username)))
 
-    for i, name in enumerate(sorted_wallets[:10]):
-        balance = jincoin.get_balance(name)
+    holders.append(
+    ("NOVA_WALLET",
+     jincoin.get_balance("NOVA_WALLET"))
+)
 
-        html = f"""
-        <p>
-            {medals[i]}
-            {name}
-            :
-            {balance:,} NOVA
-        </p>
-        """
+    holders.sort(
+    key=lambda x: x[1], reverse=True
+)
+
+    holders.sort(key=lambda x: x[1], reverse=True)
 
     login_info = ""
     if "username" in session:
@@ -1075,8 +855,6 @@ def home():
         <a href="/mywallet"><button>👤 My Wallet</button></a>
         <a href="/transactions"><button>📜 My Transactions</button></a>
         <a href="/logout"><button>🚪 Logout</button></a>
-        <a href="/send"><button>💸 Send NOVA</button></a>
-        <a href="/profile"><button>👤 My Profile</button></a>
 
         <br><br>
 
@@ -1109,45 +887,16 @@ def home():
         """
     
     html += """
-    <div class="card">
-        <h2>Wallet Balances</h2>
-    """
-
-    all_wallet_names = set()
+        <div class="card">
+            <h2>Wallet Balances</h2>
+        """
 
     for username, wallet in users_db:
-        all_wallet_names.add(username)
+        html += f"<p>{username}: {jincoin.get_balance(username)} NOVA</p>"
 
-    all_wallet_names.add("NOVA_WALLET")
-
-    for block in jincoin.chain:
-        for tx in block.transactions:
-            if isinstance(tx, dict):
-                all_wallet_names.add(tx.get("from", ""))
-                all_wallet_names.add(tx.get("to", ""))
-
-    for tx in jincoin.pending_transactions:
-        if isinstance(tx, dict):
-            all_wallet_names.add(tx.get("from", ""))
-            all_wallet_names.add(tx.get("to", ""))
-
-    all_wallet_names.discard("")
-    all_wallet_names.discard("network")
-
-    sorted_wallets = sorted(
-        all_wallet_names,
-        key=lambda name: jincoin.get_balance(name),
-        reverse=True
-    )
-
-    for name in sorted_wallets:
-        html += f"<p>{name}: {jincoin.get_balance(name)} NOVA</p>"
-
-    html += """
+    html += f"""
+        <p>NOVA_WALLET: {jincoin.get_balance("NOVA_WALLET")} NOVA</p>
         </div>
-    """
-
-    html += """
 
         <div class="card">
             <h2>Created Wallets</h2>
@@ -1165,12 +914,8 @@ def home():
 
     medals = ["1","2","3","4","5","6","7","8","9","10"]
 
-    for i, name in enumerate(sorted_wallets[:10]):
-        balance = jincoin.get_balance(name)
-
-        html += f"""
-        <p>{medals[i]} {name} : {balance:,} NOVA</p>
-        """
+    for i, holder in enumerate(holders[:10]):
+        html += f"<p>{medals[i]} {holder[0]} : {holder[1]} NOVA</p>"
 
     html += """
         </div>
