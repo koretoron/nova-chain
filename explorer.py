@@ -1,10 +1,9 @@
+import os
 from flask import Flask, jsonify, request, session, redirect
 import random
 import string
 import sqlite3
 from jincoin import jincoin
-
-import os
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
