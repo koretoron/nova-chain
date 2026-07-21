@@ -419,7 +419,7 @@ def profile():
     padding:10px;
     margin-bottom:20px;
     ">
-    
+
     <h3>🏦 Wallet Address</h3>
     <p style="
     color:#7dffb2;
@@ -1343,4 +1343,5 @@ def home():
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5050, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
