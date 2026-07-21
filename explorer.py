@@ -1,3 +1,6 @@
+import qrcode
+import base64
+from io import BytesIO
 import os
 from flask import Flask, jsonify, request, session, redirect
 import random
@@ -88,9 +91,9 @@ def signup():
     <body style="background:#0f1117; color:white; font-family:Arial; text-align:center; padding-top:100px;">
         <h1 style="color:#f39c12;">👤 NOVA Sign Up</h1>
 
-        <form method="POST">
-            <input type="text" name="username" placeholder="Username" required>
-            <input type="password" name="password" placeholder="Password" required>
+        <form method="POST" autocomplete="off">
+            <input type="text" name="username" placeholder="Username" autocomplete="off" required>
+            <input type="password" name="password" placeholder="Password" autocomplete="new-password" required>
             <button type="submit">Create Account</button>
         </form>
 
@@ -104,8 +107,8 @@ def signup():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        username = request.form["username"].upper()
-        password = request.form["password"]
+        username = request.form["nova_username"].upper()
+        password = request.form["nova_password"]
 
         conn = sqlite3.connect("nova.db")
         cursor = conn.cursor()
@@ -151,9 +154,9 @@ def login():
     <body style="background:#0f1117; color:white; font-family:Arial; text-align:center; padding-top:100px;">
         <h1 style="color:#f39c12;">🔐 NOVA Login</h1>
 
-        <form method="POST">
-            <input type="text" name="username" placeholder="Username" required>
-            <input type="password" name="password" placeholder="Password" required>
+        <form method="POST" autocomplete="off">
+            <input type="text" name="nova_username" placeholder="Username" autocomplete="new-password" required>
+            <input type="password" name="nova_password" placeholder="Password" autocomplete="new-password"required>
             <button type="submit">Login</button>
         </form>
 
@@ -340,6 +343,18 @@ def profile():
 
     username = session["username"]
     balance = jincoin.get_balance(username)
+    conn = sqlite3.connect("nova.db")
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT wallet FROM users WHERE username = ?",
+        (username,)
+    )
+
+    result = cursor.fetchone()
+    conn.close()
+
+    wallet_address = result[0] if result else "Wallet not found"
 
     all_wallet_names = set()
 
@@ -367,6 +382,13 @@ def profile():
 
     rank = sorted_wallets.index(username) + 1
 
+    qr = qrcode.make(wallet_address)
+
+    buffer = BytesIO()
+    qr.save(buffer, format="PNG")
+
+    qr_base64 = base64.b64encode(buffer.getvalue()).decode()
+
 
 
     return f"""
@@ -384,7 +406,44 @@ def profile():
     <h2>{username}</h2>
 
     <h3>💰 Balance</h3>
-    <p>{balance:,} NOVA</p>
+    <h1 style="color:#7dffb2;">{balance:,} NOVA</h1>
+
+    <h3>📱 Wallet QR Code</h3>
+
+    <img
+    src="data:image/png;base64,{qr_base64}"
+    width="180"
+    style="
+    border-radius:12px;
+    background:white;
+    padding:10px;
+    margin-bottom:20px;
+    ">
+    
+    <h3>🏦 Wallet Address</h3>
+    <p style="
+    color:#7dffb2;
+    font-size:18px;
+    font-weight:bold;
+    word-break:break-all;
+    ">
+        {wallet_address}
+    </p>
+    <button
+    id="copyBtn"
+    onclick="copyWallet()"
+    style="
+    padding:12px 22px;
+    background:#2ecc71;
+    color:white;
+    border:none;
+    border-radius:10px;
+    font-size:16px;
+    cursor:pointer;
+    margin-top:10px;
+    ">
+    📋 Copy Wallet Address
+    </button>
 
     <h3>🏆 Rank</h3>
     <p>#{rank}</p>
@@ -395,6 +454,20 @@ def profile():
         <button>🏠 Back Explorer</button>
     </a>
 
+    <script>
+    function copyWallet() {{
+        navigator.clipboard.writeText("{wallet_address}");
+
+        const btn = document.getElementById("copyBtn");
+
+        btn.innerHTML = "✅ Copied!";
+
+        setTimeout(function() {{
+            btn.innerHTML = "📋 Copy Wallet Address";
+        }}, 1500);
+    }}
+    </script>
+    
     </body>
     </html>
     """
